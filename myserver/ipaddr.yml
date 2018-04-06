@@ -1,0 +1,29 @@
+- hosts: localhost
+  tasks:
+  - name: "setup eth1"
+    shell: | 
+     cat << EOF > /etc/sysconfig/network-scripts/ifcfg-eth1
+     DEVICE="eth1"
+     IPADDR=_ipaddr_
+     NETMASK=255.255.255.0
+     BOOTPROTO="static"
+     ONBOOT="yes"
+     TYPE="Ethernet"
+     USERCTL="no"
+     IPV6INIT="no"
+  - name: bring up eth1
+    shell: ifup eth1
+  - name: create ansible user
+    shell: useradd ansible-user
+  - name: make user sudoer
+    shell: |
+     cat << EOF >/etc/sudoers.d/ansible-user
+     ansible-user ALL = (root) NOPASSWD:ALL
+  - name: change sudoers permissions
+    shell: chmod 0440 /etc/sudoers.d/ansible-user
+  - name: install ntpd
+    shell: yum -y install ntp
+  - name: enable ntpd
+    shell: systemctl enable ntpd
+  - name: start ntpd
+    shell: systemctl start ntpd

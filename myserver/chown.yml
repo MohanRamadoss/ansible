@@ -1,0 +1,13 @@
+---
+ - hosts: all
+   gather_facts: no
+    
+   tasks:
+     - name: create a directory
+       file: path=/etc/common state=directory mode=0755 
+     
+     - name: change group
+       file: path=/etc/common group=sysadmin owner=root mode=2770
+       
+         
+        

@@ -1,0 +1,43 @@
+---
+ - hosts: all
+   gather_facts: no
+
+   tasks: 
+       - name: installing mariadb
+         yum: name=mariadb-server state=present
+        
+       - name: installing python-pip
+         yum: name=python-pip state=present
+ 
+       - name: upgrading pip
+         command: pip install --upgrade pip
+
+       - name: installing MySQL-python state=present
+         yum: name=MySQL-python state=present
+
+       - name: restarting service
+         service: name=mariadb state=started enabled=yes
+
+      # - name: mainting firewll rules
+      #   firewalld: service=mysql state=enabled permanent=true
+        
+      # - name: loading firewall rules
+      #   shell: firewall-cmd --reload
+ 
+       - name: creating a database named ngbitdb
+         mysql_db: name=ngbitdb 
+        
+       - name: creating user and password in mariadb
+         mysql_user: name=ng password=redhat state=present 
+
+       - name: allow select,insert,update priveleges on ngbitdb
+         mysql_user: name=ng password=redhat state=present  priv=ngbitdb.*:select,create,insert state=present
+ 
+
+
+       
+        
+
+ 
+        
+             

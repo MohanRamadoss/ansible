@@ -1,0 +1,12 @@
+---
+ - hosts: all
+ 
+   tasks: 
+    - name: checking 
+      shell: free -m
+      when: 
+        - ansible_os_family == 'RedHat' 
+        - ansible_os_family == 'RedHat'
+      register: x
+    - name: check
+      debug: var=x 

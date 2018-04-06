@@ -1,0 +1,33 @@
+---
+ - name: defining play 1
+   hosts: dev
+   gather_facts: no
+
+   tasks:
+    - name: installing httpd server
+      yum: name=httpd state=present
+
+    - name: starting and enabling httpd service
+      service: name=httpd state=restarted enabled=yes
+
+    - name: removing existing inde pages
+      file: path=/var/www/html/index.html state=absent
+
+    - name: copy index page to all target
+      get_url: url=ftp://192.168.10.74/index.html dest=/var/www/html/index.html owner=root group=root mode=0644
+
+    - name: mainting firewall rules
+      firewalld: service=http state=enabled permanent=true
+
+    - name: loading firewall rules
+      shell: firewall-cmd --reload 
+
+ - name: defining play 2
+   hosts: devops
+   gather_facts: no
+   vars:
+    x: "Hello people\n"
+   tasks:
+     - name: copying to target motd file
+       copy: content="{{ x }}" dest=/etc/motd
+

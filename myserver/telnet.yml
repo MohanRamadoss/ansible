@@ -1,0 +1,16 @@
+---
+ - hosts: devops
+   gather_facts: no
+
+   tasks:
+    - name: installing telnet server
+      yum: name=telnet state=present
+        
+    - name: starting  and enabling telnet service 
+      service: name=telnet state=restarted enabled=yes
+
+    - name: loading firewall rules
+      shell: firewall-cmd --reload
+                          
+          
+

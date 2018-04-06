@@ -1,0 +1,18 @@
+---
+ - hosts: all
+   gather_facts: no
+   vars:
+     password: reviucWrhvDkg
+    
+   tasks:
+     - name:  add group with name sysadmin
+       group: name=sysadmin state=present
+
+     - name: add user natasha to group sysadmin
+       user: name=natasha state=present password={{password}} group=sysadmin
+     
+     - name: add sarah to group sysadmin
+       user: name=sarah state=present password={{password}} group=sysadmin
+    
+     - name: add harry with no login
+       user: name=harry state=present group=root shell=/sbin/nologin 

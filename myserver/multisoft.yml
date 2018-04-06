@@ -1,0 +1,16 @@
+---
+ - hosts: all
+   tasks:
+     - name: installing httpd, mariadb, vsftpd
+       yum: name="{{ item }}" state=present
+       with_items:
+        - httpd
+        - vsftpd
+        
+     - name: starting service
+       service: name="{{ item }}" state=restarted  enabled=yes
+       with_items:
+         - httpd
+         - vsftpd
+          
+     

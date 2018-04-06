@@ -1,0 +1,13 @@
+---
+ - hosts: all
+
+   tasks: 
+        - name: add single user neo
+          user: name=neo comment="Neo Two" uid=1040 group=root
+
+        - name: create cron file
+          cron: name="check dirs" hour="5,2" user=neo job="ls -alh > /dev/null"
+
+   
+         
+         

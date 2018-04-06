@@ -1,0 +1,23 @@
+---
+ - hosts: localhost
+   gather_facts: false
+   vars:
+    - key_name: raj
+    - aws_region: ap-south-1
+    - ami_id: ami-531a4c3c
+    - instance_type: t2.micro
+    
+   tasks:
+    - name: creating instance
+      ec2:
+       aws_access_key: use your own access key 
+       aws_secret_key: use your own secret key
+       key_name: "{{key_name}}"
+       region: "{{aws_region}}"
+       instance_type: "{{instance_type}}"
+       image: "{{ami_id}}"     
+       wait: yes
+#       group: launch-wizard-1
+#       vpc_subnet_id: subnet-29e63245
+#       assign_public_ip: yes
+register: basic_ec2

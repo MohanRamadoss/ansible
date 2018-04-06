@@ -1,0 +1,12 @@
+---
+ - hosts: all
+ 
+   tasks: 
+      - name: creating partition with size 400KiB
+        parted: device=/dev/vda number=3 state=present part_end=400KiB
+       
+      - name: create directory for mount
+        file: path=/etc/naman95/bg1 state=directory mode=0755
+
+      - name: mount partition on /etc/mnt1
+        mount: state=mounted fstype=xfs path=/etc/naman95/bg1 src=/dev/vda3
