@@ -1,0 +1,8 @@
+- hosts: app
+  tasks:
+  - name: Upgrade all packages
+    yum: name=* state=latest
+
+  - name: install epel-release
+    yum: name=epel-release state=present
+    when: ansible_os_family == 'CentOS'

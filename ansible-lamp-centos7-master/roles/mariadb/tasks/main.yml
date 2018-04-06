@@ -1,0 +1,47 @@
+---
+# tasks file for mariadb
+- name: Install MariaDB 
+  yum: name={{ item }} state=installed
+  with_items:
+    - mariadb-server
+    - mariadb
+    - MySQL-python
+#    - expect
+
+#- name: Create MariaDB Configuration Files
+#  template: src=my.cnf.j2 dst=/etc/my.cnf
+#  notify: 
+#    - restart mariadb
+
+#- name: Create MariaDB log file
+#  file: path=/var/log/mysqld.log state=touch owner=mysql group=mysql mode=0775
+
+#- name: Create MariaDB PID directory
+#  file: path=/var/run/mysqld state=directory owner=mysql group=mysql mode=0775
+
+- name: Start MariaDB Service
+  service: name=mariadb state=started enabled=yes
+
+
+#- name: Initialize MariaDB
+#- copy: src=mysql_secure_installation.sh dest=/root/mysql_secure_installation.sh owner=root group=root mode=0755
+#- command: bash /root/mysql_secure_installation.sh
+
+
+#- name: Create Application Database
+#  mysql_db: name={{ dbname }} state=present
+
+#- name: Create Application DB User
+#  mysql_user: name={{ dbuser }} password={{ upassword }} priv=*.*:ALL host='%' state=present
+
+
+- name: Update root password
+  mysql_user: name=root host={{ item }} password={{ mariadb_root_password }} state=present
+  with_items:
+    - 127.0.0.1
+    - ::1
+    - localhost
+  tags: mariadb
+  notify: 
+   - restart mariadb
+

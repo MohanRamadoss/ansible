@@ -1,0 +1,8 @@
+# target hostname or group name
+- hosts: web
+# define tasks
+  tasks:
+# task name (any name you like)
+  - name: Test file
+# use file module to set the file state
+    file: path=/tmp/test.conf state=touch owner=root group=root mode=0600

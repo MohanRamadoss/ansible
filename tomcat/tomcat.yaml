@@ -1,0 +1,148 @@
+---
+- hosts: app
+  remote_user: root
+  sudo: yes
+
+# Install variables
+# Make sure your versions are compatible http://tomcat.apache.org/whichversion.html
+  vars:
+    tomcat_version: '8.5.29' #Enter tomcat version in this formatonly
+    java_version: '8u162' #Enter Java version in this format only
+    java_build: 'b17' #Enter the beta version
+    jdk_or_jre: jdk
+    java_ext: tar.gz
+    openjdk: True # Set to true to use openjdk instead of oracle java
+    http_port: 8080
+    https_port: 8443
+# URLs
+    jdk_download_url: "http://download.oracle.com/otn-pub/java/jdk/{{ java_version }}-{{ java_build }}/{{ jdk_or_jre }}-{{ java_version }}-linux-x{{ ansible_userspace_bits }}.{{ java_ext }}"
+    jdk_archive_file: "{{ jdk_or_jre }}-{{ java_version }}-linux-x{{ ansible_userspace_bits }}.{{ java_ext }}"
+    jdk_extract_folder: "jdk1.{{ java_version|replace('u','.0_') }}"
+    tomcat_download_url: "http://archive.apache.org/dist/tomcat/tomcat-{{ tomcat_version|first() }}/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz"
+    tomcat_archive_file: "apache-tomcat-{{ tomcat_version }}.tar.gz"
+
+# Environment variables
+    java_home: /opt/java/java
+    jre_home: /opt/java/java/jre
+
+
+# User management
+    tomcat_user: tomcat
+    tomcat_user_home: /home/tomcat
+    tomcat_uid: '500'
+    manager_user: manager-gui
+    manager_password: managersecret
+
+
+# tasks for Java
+
+  tasks:
+  - name: Creates directory
+    file: path=/opt/java state=directory
+
+  - name: Download Java {{java_version}}
+    command: "wget -q -O /opt/java/jdk-8u162-linux-x64.tar.gz --no-cookies --no-check-certificate --header 'Cookie: oraclelicense=accept-securebackup-cookie' http://download.oracle.com/otn-pub/java/jdk/8u162-b12/0da788060d494f5095bf8624735fa2f1/jdk-8u162-linux-x64.tar.gz"
+    tags:
+      - java
+
+  - name: Extract java {{java_version}}
+    shell: tar xzf /opt/java/{{jdk_archive_file}} -C /opt/java creates=/opt/java/{{jdk_extract_folder}}
+    tags:
+      - java
+
+  - name: Update Java permissions
+    file: "state=directory path=/opt/java/{{jdk_extract_folder}} owner=root group=root recurse=yes"
+    tags:
+      - java
+
+  - name: Create java symlink
+    file: path={{java_home}} src=/opt/java/{{jdk_extract_folder}} state=link
+    tags:
+      - java
+
+  - name: Setup Java
+    command: 'update-alternatives --install "/usr/bin/java" "java" "/opt/java/java/bin/java" 100'
+    tags:
+      - java
+
+  - name: Register Java.sh
+    template: src=export/java.sh  dest=/etc/profile.d/java.sh  owner=root group=root mode=0744 #This file can be even placed at github and download from there using wget
+    tags:
+      - java
+
+  - name: Source the bashrc file
+    shell: source /etc/profile.d/java.sh
+    tags:
+      - java
+
+  - name: Delete temporary java files
+    file: state=absent path=/opt/java/{{jdk_archive_file}}
+    ignore_errors: yes
+    tags:
+      - java
+
+
+# tasks for tomcat
+
+  - name: Creates tomcat directory
+    file: path=/app/tomcat state=directory
+    tags:
+      - tomcat
+
+  - name: Download tomcat
+    shell: 'wget {{tomcat_download_url}} -O /app/tomcat/{{tomcat_archive_file}} creates=/app/tomcat/{{tomcat_archive_file}}'
+    tags:
+      - tomcat
+
+  - name: Extract tomcat
+    shell: tar xzf /app/tomcat/{{tomcat_archive_file}} -C /app/tomcat creates=/app/tomcat/apache-tomcat-{{ tomcat_version }}
+    tags:
+      - tomcat
+
+  - name: Create tomcat symlink
+    file: path=/app/tomcat/tomcat state=link src=/app/tomcat/apache-tomcat-{{ tomcat_version }}
+    tags:
+      - tomcat
+
+  - name: Create tomcat group
+    group: name=tomcat state=present
+    tags:
+      - tomcat
+
+  - name: Create tomcat user
+    user: name=tomcat home={{tomcat_user_home}} uid={{ tomcat_uid }} shell=/bin/sh group=tomcat state=present
+    ignore_errors: True
+    tags:
+      - tomcat
+
+
+  - name: Delete temporary tomcat file
+    file: path=/app/tomcat/{{tomcat_archive_file}} state=absent
+    ignore_errors: yes
+    tags:
+      - tomcat
+
+  - name: download tomcat.service script
+    copy: src=export/tomcat.service  dest=/usr/lib/systemd/system/
+    tags:
+      - tomcat
+
+  - name: Set tomcat folder permissions
+    file: path=/app/tomcat/apache-tomcat-{{ tomcat_version }} owner=tomcat group=tomcat mode=755 recurse=yes
+    tags:
+      - tomcat
+
+  - name: systemd daemon-reload
+    shell: systemctl daemon-reload
+    tags:
+      - tomcat
+
+  - name: Start tomcat
+    service: name=tomcat.service state=restarted enabled=yes
+    tags:
+      - tomcat
+
+  - name: wait for tomcat to start
+    wait_for: port={{ http_port }} timeout=60
+    tags:
+      - tomcat

@@ -1,0 +1,15 @@
+---
+# tasks file for apache
+- name: Install Apache packages
+  yum: name={{ item }} state=present
+  with_items:
+    - httpd
+    - php
+    - php-mysql
+    - php-gd
+    - php-pear 
+
+- name: Enable and Start Service
+  service: name=httpd state=started enabled=yes
+
+- include: copy_code.yml 

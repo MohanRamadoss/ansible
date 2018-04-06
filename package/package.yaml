@@ -1,0 +1,29 @@
+- hosts: app
+  tasks:
+  - name: Upgrade all packages
+    yum: name=* state=latest
+
+  - name: install epel-release
+    yum: name=epel-release state=present
+    when: ansible_os_family == 'CentOS'
+    tags: configure
+
+  - name: Install system packages.
+    yum: name={{ item }}  state=present
+    with_items:
+    - libselinux-python
+    - docker-python
+    - python-yaml
+    - net-tools
+    - nfs-utils
+    - mc
+    - vim
+    - wget
+    - git
+    - ntp
+    - telnet
+    - mtr
+    - htop
+    - iotop
+    - mailx
+    tags: install

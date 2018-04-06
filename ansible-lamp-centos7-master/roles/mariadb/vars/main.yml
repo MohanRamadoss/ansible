@@ -1,0 +1,8 @@
+---
+# vars file for mariadb
+mysqlservice: mysqld
+mysql_port: 3306
+dbuser: testuser
+dbname: testdb
+upassword: password
+mariadb_root_password: password

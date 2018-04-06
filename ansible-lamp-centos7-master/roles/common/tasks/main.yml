@@ -1,0 +1,19 @@
+---
+# tasks file for common
+- name: install updates
+  yum: name=* state=latest
+
+- name: Install EPEL Repo
+  yum: name=epel-release state=installed
+
+- name: Install Common packager (wget, net-tools)
+  yum: name={{ item }} state=latest
+  with_items:
+     - wget
+     - net-tools
+     - libselinux-python
+- name: Disable SELinux
+  selinux: state=disabled 
+
+- name: Set Hostname
+  hostname: name={{ host_name }}

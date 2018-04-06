@@ -1,0 +1,16 @@
+---
+# tasks file for phpmyadmin
+- name: Install PhpMyAdmin
+  yum: name=phpmyadmin state=latest enablerepo=epel
+  
+- name: Copy PhpMyAdmin Config Files
+  #copy: src=config.inc.php dest=/etc/phpMyAdmin/config.inc.php owner=root group=apache mode=0775 
+  command: /usr/bin/sed -i s/'cookie'/'http'/g /etc/phpMyAdmin/config.inc.php  
+
+- name: Copy PhpMyAdmin Appache Config Files
+  copy: src=phpMyAdmin.conf dest=/etc/httpd/conf.d/phpMyAdmin.conf owner=root group=root mode=0775
+  notify: restart apache
+
+
+#- command: /usr/bin/sed -i 
+

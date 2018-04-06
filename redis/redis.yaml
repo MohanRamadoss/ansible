@@ -1,0 +1,37 @@
+- hosts: db
+  remote_user: root
+  sudo: yes
+  tasks:
+
+   - name: install epel repo for redis on CentOS
+     yum: name=epel-release state=present
+
+   - name: install redis deps
+     yum: name={{item}} state=present
+     with_items:
+      - make
+      - gcc
+      - wget
+     
+  
+   - name: Install the redis rpm
+     yum: name=redis
+   
+   - name: start the redis  service
+     service: name=redis state=started enabled=yes
+   
+   - name: copy custom redis.conf
+     copy: src=redis.conf dest=/etc/redis.conf
+   
+   - name: restart redis
+     service: name=redis state=restarted
+
+   - name:  Set vm.swappiness to 5 in /etc/sysctl.conf
+     sysctl: name=vm.swappiness value=5 state=present
+   
+   - name:  Set Enable overcommit memory 
+     sysctl: name=vm.overcommit_memory value=1 state=present
+
+   - name: IMPROVE SYSTEM MEMORY MANAGEMENT
+     sysctl: name=fs.file-max value=2097152 state=present
+

@@ -1,0 +1,13 @@
+- name: apply common configuration to all nodes
+  hosts: web
+  remote_user: root
+
+  roles:
+    - common
+    - apache
+    - mariadb
+    - phpmyadmin
+    - iptables
+
+#- name: Reboot The Machine
+#  command: 
