@@ -1,0 +1,29 @@
+---
+  - name: Understanding the Correct RedHat Based Distributions
+    fail: msg="Server OS is not RedHat Based Distributions or Package Manager is not yum"
+    when: (ansible_os_family != "RedHat" and ansible_pkg_mgr != "yum" and ansible_distribution_major_version != '5')
+  - name: Doing a yum clean
+    shell: yum clean all
+  - name: Checking for yum check-update before running yum update
+    shell: 'yum check-update > /home/{{ var_remote_user }}/yum_cu_pre.log  || test $? -eq 100'
+  - name: Fetching the result of yum check-update
+    fetch: src=/home/{{ var_remote_user }}/yum_cu_pre.log dest=/home/{{ var_remote_user }}/logs/yum_cu_pre.log.{{ ansible_hostname }} flat=yes chmod=750
+  - name: Running yum update to patch the system
+    yum: name=* state=latest
+    async: 7200
+    poll: 15
+  - name: Checking for yum check-update after running yum update
+    shell: 'yum check-update > /home/{{ var_remote_user }}/yum_cu_post.log  || test $? -eq 100'
+  - name: Fetching the result of yum check-update
+    fetch: src=/home/{{ var_remote_user }}/yum_cu_post.log dest=/home/{{ var_remote_user}}/logs/yum_cu_post.log.{{ ansible_hostname }} flat=yes chmod=750
+  - name: Determine if the Kernel upgrade has happened for EL6/7
+    shell: if [ "`rpm -q kernel --queryformat '%{installtime} %{version}-%{release}.%{arch}\n' | sort -n -k1 | tail -1 | cut -d ' ' -f 2`" = "`uname -r`" ]; then echo "latest kernel already booted."; else echo "new kernel. reboot required."; fi
+    ignore_errors: true
+    register: reboot_hint
+  - name: Determine Reboot is needed or not
+    shell: sleep 2 && /sbin/shutdown -r now "Ansible kernel update applied"
+    async: 0
+    poll: 0
+    ignore_errors: true
+    when: reboot_hint.stdout.find("reboot required.") != -1
+    register: rebooting
