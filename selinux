@@ -1,0 +1,19 @@
+
+# ansible-playbook selinux.yml --user mohan --extra-vars "host=10.10.10.11"
+
+---
+- hosts: "{{ host }}"
+  become: yes
+  become_method: sudo
+  tasks:
+    - name: getting selinux status
+      command: getenforce
+      register: result
+
+    - name: removing old status file
+      local_action: file path={{ playbook_dir }}/{{ inventory_hostname }}-selinux-{{ result.stdout }} state=absent
+
+    - name: saving selinux status
+      local_action: file path={{ playbook_dir }}/{{ inventory_hostname }}-selinux-{{ result.stdout }} state=touch
+
+This playbook creates a file in the playbook directory in name like 10.10.10.11-selinux-Disabled
