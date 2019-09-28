@@ -1,0 +1,21 @@
+- hosts: 127.0.0.1
+  become: yes
+  tasks:
+    - name: Upgrade all packages for redhat
+      yum: name=* state=latest
+      async: 7200
+      poll: 15
+      when: ansible_os_family == "RedHat"
+
+    - name: Determine if the Kernel upgrade has happened for EL6/7
+      shell: if [ "`rpm -q kernel --queryformat '%{installtime} %{version}-%{release}.%{arch}\n' | sort -n -k1 | tail -1 | cut -d ' ' -f 2`" = "`uname -r`" ]; then echo "latest kernel already booted."; else echo "new kernel. reboot required."; fi
+      ignore_errors: true
+      register: reboot_hint
+
+    - name: Determine Reboot is needed or not
+      shell: sleep 2 && /sbin/shutdown -r now "Ansible kernel update applied"
+      async: 0
+      poll: 0
+      ignore_errors: true
+      when: reboot_hint.stdout.find("reboot required.") != -1
+      register: rebooting
