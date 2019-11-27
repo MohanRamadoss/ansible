@@ -1,0 +1,191 @@
+vi firstplaybook.yaml
+---
+ - hosts: grp1
+   become: true
+   tasks:
+      - name: installing packages
+	    yum: name=httpd state=present
+		register: installation_log
+
+      - name: starting the service
+	    service: namte=httpd enabled=yes state=started                    
+		when: installation_log|success     
+
+
+vi secondplaybook.yaml
+---
+ - hosts: grp1
+   become: true
+   tasks:
+      - name: installing packages
+	    yum: name={{item}} state=present
+		with_items:
+		   - httpd
+		   - screen
+		    - java
+		register: installation_log	
+
+      - name: starting the service
+	    service: name={{item}} enabled=yes state=started
+		with_items:
+		   - httpd 
+		when: installation_log|success  
+		
+	
+vi thirdplaybook.yaml
+---
+ - hosts: grp1
+   become: true
+   vars:
+     Pkg:
+	   - java
+	   - screen
+	   - httpd
+	  service: httpd
+  tasks:
+      - name: installing packages
+	    yum: name={{item}} state=present
+		with_items:
+		   - {{ pkg }}
+		register: installation_log	
+
+      - name: starting the service
+	    service: name={{item}} enabled=yes state=started
+		with_items:
+		   - {{ service }}
+		when: installation_log|success 	
+		
+
+
+vi httpvar.yaml
+---
+Pkg:
+  - java
+  - screen
+  - httpd
+service: httpd
+
+vi fourthplaybook.yaml
+---
+ - hosts: grp1
+   become: true
+   var_files:
+     - httpvar.yaml
+  tasks:
+      - name: installing packages
+	    yum: name="{{item}}" state=present
+		with_items:
+		   - "{{ pkg }}"
+		register: installation_log	
+
+      - name: starting the service
+	    service: name="{{item}}" enabled=yes state=started
+		with_items:
+		   - "{{ service }}"
+		when: installation_log|success 
+
+
+ansible-playbook fourthplaybook.yaml -e '{"FileName": nonprod.yaml}' -e '{"GroupFile": nonprodgroup}'
+
+
+vi fifthplaybook.yaml
+---
+ - hosts: grp1
+   become: true
+   var_files:
+     - httpvar.yaml
+  tasks:
+      - name: installing packages
+	    yum: name="{{item}}" state=present
+		with_items:
+		   - "{{ pkg }}"
+		notify:
+		  - starting_httpd_service
+		  
+   handlers:
+      - name: starting_httpd_service
+	    service: name="{{item}}" enabled=yes state=started
+		with_items:
+		   - "{{ service }}"
+    
+	
+	
+	vi sixplaybook.yaml
+---
+ - hosts: grp1
+   become: true 
+   tasks:
+      - name:  including variables tasks
+	    include_vars: httpvar.yaml
+		
+      - name: installing packages
+	    yum: name="{{item}}" state=present
+		with_items:
+		   - "{{ pkg }}"
+		notify:
+		  - starting_httpd_service
+		  
+   handlers:
+      - name: starting_httpd_service
+	    service: name="{{item}}" enabled=yes state=started
+		with_items:
+		   - "{{ service }}"
+		   
+		   
+vi sevenplaybook.yaml
+---
+ - hosts: grp1
+   become: true 
+   tasks:
+      - name:  including variables tasks
+	    set_fact:
+		    pkg: httpd 		
+            service: httpd
+			when: ansible_os_family == "RedHat" and ansible_distribution_major_version == "7"
+			
+	    - name:  including variables tasks
+	      set_fact:
+			pkg : apache2 
+            service: apache
+			when: ansible_os_family == "CentOS" and ansible_distribution_major_version == "7"
+			
+      - name: installing packages
+	    yum: name="{{item}}" state=present
+		with_items:
+		   - "{{ pkg }}"
+		notify:
+		  - starting_httpd_service
+		  
+   handlers:
+      - name: starting_httpd_service
+	    service: name="{{item}}" enabled=yes state=started
+		with_items:
+		   - "{{ service }}"
+		   
+	--- 1.7.0 --> 1.8.0   
+		 		   
+vi eightplaybook.yaml
+---
+ - hosts: grp1
+   become: true 
+   tasks:
+	  - name: gathering package version
+	    command: rpm -qa java-*|cut -d "-" -f2|uniq
+        register: java_version
+
+     - name: debug output
+       debug: var=java_version.output
+	   
+	 - name: setting the fact value
+	   set_facts:
+	        javaInstVer: java_version.output
+			
+      - name: validate and upgrade java package
+	    yum: name=java-1.8.* state=present
+		when: javaInstVer == 1.7.0 or javaInstVer == 1.7.*
+		
+		
+		
+		
+	   
+	   
