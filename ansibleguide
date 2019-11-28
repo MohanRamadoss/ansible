@@ -1,0 +1,863 @@
+root@ubuntu:/etc/sudoers.d# cat ansible 
+ansible    ALL=(ALL) NOPASSWD:ALL
+
+# ~/base/ansible.cfg
+
+[defaults]
+remote_user = ansible
+host_key_checking = false
+inventory = inventory
+
+[privilege_escalation]
+become = True
+become_method = sudo
+become_user = root
+become_ask_pass = False
+
+# ~/base/invetory
+ansible01
+ansible02
+ubuntu
+
+$ ansible all --list-hosts
+$ ansible-doc -l
+$ ansible-doc MODULENAME
+$ ansible all -m command -a id
+$ ansible all -m shell -a env
+
+Intentation is very important in YAML files for playbooks
+
+---
+- name: deploy vsftpd
+  hosts: all
+  tasks:
+          - name: install vsftpd
+            package:
+                    name: vsftpd
+                    state: latest
+          - name: enable vsftpd
+            service: name=vsftpd enabled=true
+          - name: create readme file
+            copy:
+                    content: "welcome to my friendly server\n"
+                    dest: /var/ftp/pub/README
+                    force: no
+                    mode: 0444
+
+$ ansible-playbook deploy-vsftpd.yml
+
+Variable makes ansible flexibale
+Ansible facts can be also used as variable
+Local facts can also user as variable - by pushing to machines
+Inclusions - in order make small playbooks for specific tasks
+
+
+
+---
+- name: deploy webserver centos machines
+  hosts: ansible01 ansible02
+  vars:
+          apache_package: httpd
+          firewall_package: firewalld
+          web_service: httpd
+          firewall_service: firewalld
+          rule: http
+
+  tasks:
+          - name: install apache and firewall
+            yum:
+              name:
+                - "{{ apache_package }}"
+                - "{{ firewall_package }}"
+              state: latest
+
+          - name: start and enable {{ firewall_service }}
+            service:
+              name: "{{ firewall_service }}"
+              enabled: true
+              state: started
+
+          - name: create web content
+            copy:
+                    content: "welcome to ansible managed service"
+                    dest: /var/www/html/index.html
+          - name: start and enable {{ web_service }}
+            service:
+                    name: "{{ web_service }}"
+                    enabled: true
+                    state: started
+
+          - name: enable firewall {{ rule }}
+            firewalld:
+                    service: "{{ rule }}"
+                    permanent: true
+                    immediate: true
+                    state: enabled
+
+- name: verify web server
+  hosts: localhost
+  become: false
+  tasks:
+    - name: test that webserver is available
+      uri:
+        url: http://ansible01
+        status_code: 200
+                             
+Jinja2 Templates
+To modify YAML files before they are sent to the managed host
+
+[ansible@rovshan-host base]$ cat variable-jinja.yml 
+---
+- name: deploy webserver centos machines
+  hosts: ansible02
+  vars:
+          apache_package: httpd
+          firewall_package: firewalld
+          web_service: httpd
+          firewall_service: firewalld
+          rule: http
+          system_owner: anna@example.com
+
+  tasks:
+          - name: install apache and firewall
+            yum:
+              name:
+                - "{{ apache_package }}"
+                - "{{ firewall_package }}"
+              state: latest
+
+          - name: start and enable {{ firewall_service }}
+            service:
+              name: "{{ firewall_service }}"
+              enabled: true
+              state: started
+
+          - template:
+                  src: http.j2
+                  dest: /etc/httpd/conf.d
+                  owner: root
+                  group: root
+                  mode: 0644
+
+          - name: create web content
+            copy:
+                    content: "welcome to ansible managed service"
+                    dest: /var/www/html/index.html
+          - name: start and enable {{ web_service }}
+            service:
+                    name: "{{ web_service }}"
+                    enabled: true
+                    state: started
+
+          - name: enable firewall {{ rule }}
+            firewalld:
+                    service: "{{ rule }}"
+                    permanent: true
+                    immediate: true
+                    state: enabled
+
+- name: verify web server
+  hosts: localhost
+  become: false
+  tasks:
+    - name: test that webserver is available
+      uri:
+        url: http://ansible01
+        status_code: 200
+                             
+
+[ansible@rovshan-host base]$ cat http.j2 
+NameVirtualHost {{ ansible_fqdn }}
+
+<VirtualHost {{ ansible_fqdn }}:80>
+	ServerName {{ ansible_fqdn }}
+	ServerAdmin {{ system_owner }}
+	DocumentRoot /var/www/html
+</VirtualHost>
+
+
+[ansible@rovshan-host base]$ ansible ansible02 -m command -a "cat /etc/httpd/conf.d/http.j2"
+ansible02 | CHANGED | rc=0 >>
+NameVirtualHost ansible02
+
+<VirtualHost ansible02:80>
+	ServerName ansible02
+	ServerAdmin anna@example.com
+	DocumentRoot /var/www/html
+</VirtualHost>
+
+
+### VAGRANT ###
+Vagrant, box, providers (vbox, vmware, hyper-v, kvm), images, provisioners, Vagrantfile
+config.vm.provision
+ansible_local provisioner run on vagrant hosts directly
+Folder types - VirtualBox, Rsync
+config.vm.network: forwarded_port, guest: 80, host: 8080
+
+[ansible@rovshan-host vagrant]$ cat Vagrantfile 
+Vagrant.configure("2") do |config|
+  config.vm.box = "centos/7"
+  config.vm.hostname = "test1.example.com"
+  config.vm.network "forwarded_port", guest: 80, host: 8000
+  config.vm.provision "ansible" do |ansible|
+	ansible.playbook = 'playbook.yml'
+  end
+end
+[ansible@rovshan-host vagrant]$ cat playbook.yml 
+---
+- name: deploy webserver centos machines
+  hosts:  all
+  become: yes
+  become_user: root
+  vars:
+          apache_package: httpd
+          firewall_package: firewalld
+          web_service: httpd
+          firewall_service: firewalld
+          rule: http
+
+  tasks:
+          - name: install apache and firewall
+            yum:
+              name:
+                - "{{ apache_package }}"
+                - "{{ firewall_package }}"
+              state: latest
+
+          - name: start and enable {{ firewall_service }}
+            service:
+              name: "{{ firewall_service }}"
+              enabled: true
+              state: started
+
+          - name: create web content
+            copy:
+                    content: "welcome to vagrant and ansible managed service"
+                    dest: /var/www/html/index.html
+          - name: start and enable {{ web_service }}
+            service:
+                    name: "{{ web_service }}"
+                    enabled: true
+                    state: started
+
+          - name: enable firewall {{ rule }}
+            firewalld:
+                    service: "{{ rule }}"
+                    permanent: true
+                    immediate: true
+                    state: enabled
+
+######################################
+### Managing IT Infra with Ansible ###
+######################################
+
+Windows, appliance, cloud modules
+Mostly modules executed on remote devices/hosts
+On appliances in some cases it will be API-based
+
+$ ansible-doc -l
+$ ansible-doc aws_s3 #example
+
+# Dynamic Inventories
+List of managed devices
+Default in /etc/ansible/hosts; asible.cfg; -i option
+https://github.com/ansible/ansible/tree/devel/contrib/invetory
+Win_RM module is needed to manage Windows devices
+
+docker_container, docker_image, docker_service
+$ sudo pip install docker-compose
+$ sudo pip install docker-py
+
+Cloud instances need to be discoveried dinamically, ec2.py and ec2.ini
+
+$ sudo pip install boto # needed for aws modules
+
+
+AMI ID of Images needed
+$ sudo yum install awscli 
+$ aws ec2 describe-images --regionus-west-2 --filter \
+Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64*
+
+Find ImageId
+
+$ vim ubuntu.yml
+- name: create an ubuntu instance on EC2
+  hosts: localhost
+  tasks:
+  - name: start an instance
+    ec2:
+    	aws_access_key: XXXXXXXXXXXX
+    	aws_secret_key: XXXXXXXXXXXX
+    	image: ami-xxxxxxxxxxxx
+    	region: us-west-2
+    	instance_type: t2.nano
+    	key_name: january2019
+    	group: all-open
+
+$ aws ec2 describe-instances --region us-west-2 | grep InstanceId
+
+####################
+### Task Control ###
+####################
+
+--- WITH_ITEMS ---
+
+- name: httpd and vsftpd are running
+  service:
+  	name: "{{ item }}"
+  	state: started
+  with_items:
+    - httpd
+    - vsftpd
+----------------------------------------------------
+# variables
+...
+vars:
+  web_services:
+  	- httpd
+  	- vsftpd
+  	...
+  	
+		with_items: "{{ web_services }}"
+		
+----------------------------------------------------
+# hash/dictionary
+
+- name: manage users and group membership
+  user:
+  	name: "{{ item.name }}"
+  	state: present
+  	groups: "{{ item.groups }}"
+  with_items:
+    - { name: 'linda', groups: 'students' }
+    - { name: 'anna', groups: 'profs' }
+----------------------------------------------------
+# EXAMPLE
+[ansible@rovshan-host base]$ cat user-group.yml 
+- name: manage users and group membership
+  hosts: all
+  tasks:
+
+  - name: creating groups first
+    group:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - profs
+      - students
+
+  - name: setup user and groups
+    user:
+      name: "{{ item.name }}"
+      state: present
+      groups: "{{ item.groups }}"
+    with_items:
+      - { name: 'linda', groups: 'students' }
+      - { name: 'anna', groups: 'profs' }
+
+
+--- NESTED LOOPS ---
+
+  - name: setup user and groups
+    user:
+      name: "{{ item[0] }}"
+      state: present
+      groups: "{{ item[1] }}"
+    with_nested:
+      - [ 'linda', 'anna' ]
+      - [ 'students', 'profs' ]
+
+#EXAMPLE
+
+[ansible@rovshan-host base]$ cat nested-items.yml 
+--- 
+- name: nested items
+  hosts: all
+  vars:
+          myusers:
+                  - linda1
+                  - anna1
+          mygroups:
+                  - students1
+                  - profs1
+  tasks:
+          - name: create groups
+            group:
+                    name: "{{ item }}"
+                    state: present
+            with_items: "{{ mygroups }}"
+          - name: create user with groups membership
+            user:
+                    name: "{{ item[0] }}"
+                    state: present
+                    groups: "{{ item[1] }}"
+            with_nested:
+                    - "{{ myusers }}"
+                    - "{{ mygroups }}"
+
+---------------------------------------------------------------
+with_file
+with_fileglob
+with_sequence
+with_random_choice
+
+
+--- WHEN STATEMENT ---
+
+tasks:
+  - name: install samba
+    package:
+      name: samba
+    when: STATEMENT
+    
+# EXAMPLES
+ansible_machine == "x86_64"
+max_memory == 1024
+myvar is defined
+myvar is not defined
+myvar
+not myvar
+and, or, parenthesis
+
+$ ansible all -m setup -a "filter=ansible_distribution"
+
+with_items can get values from ansible facts directly
+
+
+- name: install vsftp if there is enough space
+  hosts: all
+  tasks:
+  - name: install vsftpd if suff sapce on /var/ftp
+  	package:
+  		name: vsftpd
+  		state: latest
+  	with_items: "{{ ansible_mounts }}"
+    when: item.mount == "/var/ftp" and item.size_available > 100000000
+    
+...
+register: result
+...
+when: result.rc == 0    
+
+
+--- REGISTERING VARIABLES ---
+
+---
+- name: registering variable demo
+  hosts: all
+  tasks:
+  - name: listing who is logged in
+    command: who
+    register: loggedin # registering output of who command as loggedin 
+  - shell: echo "user ansible is logged in"
+    when: loggedin.stdout.find('ansible') != -1 #in stdout of loggedin finds ansible
+    
+---
+- name: registered var usage for a loop list
+  host: all
+  tasks:
+  
+    - name: create the backup spooler directory
+      file:
+        path: /var/bkspool
+        state: directory
+        
+    - name: retrieve the list of home directories
+      command: ls  /home
+      register: home_dirs
+      
+    - name: add home dirs to the backup spooler
+      file:
+        path: /var/bkspool/{{ item }}
+        src: /home/{{ item }}
+        state: link
+      loop: "{{ home_dirs.stdout_lines }}"      
+
+--- HANDLERS ---
+
+Task will be run if another task(s) was successfull
+There is orderning!
+Notify item is needed to trigger handler
+Handlers run after all other tasks!
+
+
+---
+- name: copy new index.html
+  hosts: all
+  tasks:
+    - name: install httpd
+      yum: name=httpd
+  tasks:
+    - name: copy index.html
+      copy:
+        src: /tmp/index.html
+        dest: /var/www/html/index.html
+      notify:
+        - restart_web
+  handlers:
+    - name: restart_web
+      service:
+        name: httpd
+        state: restarted
+        
+---
+
+--- TAGS ---
+
+Resource level for running part of playbook
+--tags 'tagname'
+--skip-tags 'tagname'
+tagged, untagged, all
+
+---
+- name: tag example
+  hosts: centos
+  tasks:
+    - name: install net tools
+      package:
+        name: "{{ item }}"
+        state: installed
+      with_items:
+        - nmap
+        - wireshark
+      tags:
+        - net_tools
+     
+    - name: install lamp packages
+      package:
+        name: "{{ items }}" 
+        state: installed
+      with_items:
+        - mariadb-server
+        - httpd
+      tags:
+        - lamp         
+
+$ ansible-playbooh --tags=lamp tags.yaml
+
+--- DEALING WITH ERRORS ---
+
+- package:
+     name: boris
+     state: latest
+  ignore_errors: yes 	# there is no package like boris
+  						# ignore_errors will ignore it and go on
+  						
+  						
+force_handlers: yes # will run handler despite error(s) on task(s)
+
+failed_when
+
+tasks:
+  - shell: /usr/local/bin/mkuser.sh
+    register: mkuser_result
+    failed_when: "'Password missing' in mkuser_result.stdout
+
+changed_when
+
+- shell: wall 'beep'
+  changed_when: false # output will not show changed status, no need for that
+  
+--- ANSIBLE BLOCKS ---
+
+Logically group tasks
+Error handling and when statements
+Rescue (run when previous task failed)
+Always (run what ever happens on previous task(s))
+
+---
+- name: block example
+  hosts: all
+  tasks:
+    - name: install apache
+      block:
+        - package:
+            name: "{{ item }}"
+            state: installed
+          with_items:
+            - httpd
+            - elinks
+            - mod_ssl
+        - service:
+            name: httpd
+            state: started
+           enabled: True
+      when: ansible_distribution == 'CentOS'            
+
+# ADDITIONAL EXAMPLES
+
+include_vars: /path/to/{{ ansible_os_family }}.yml
+
+- include_tasks: name.yml
+  when: FACT == SOMETHING
+  
+handlers:
+  - name: handler_name
+    debug:
+      msg: this is debug message example
+      
+--- WORKING WITH ROLES ---
+
+More structure way of including tasks, templates, variables etc. 
+Community roles can be downloaded from Ansible Galaxy
+
+Defaults
+Files
+Handlers
+Meta
+Tasks
+Vars
+
+---
+- hosts: server1
+  roles:
+    - role1
+    - role2
+    
+---
+dependencies:
+  - { role: apache, port: 80 }
+  - { role: mariadb, dbname: addressess, admin_user: bob }
+  
+pre_tasks
+post_tasks
+
+--- CREATING ROLES ---
+
+$ mkdir roles
+$ cd roles
+$ ansible-galaxy init --offline motd
+$ tree 
+.
+└── motd
+    ├── defaults
+    │   └── main.yml # here we can set default variable
+    ├── files
+    ├── handlers
+    │   └── main.yml
+    ├── meta
+    │   └── main.yml
+    ├── README.md
+    ├── tasks
+    │   └── main.yml # here we define main tasks
+    ├── templates
+    │   └── motd.j2 # here we locate templates
+    ├── tests
+    │   ├── inventory
+    │   └── test.yml
+    └── vars
+        └── main.yml
+
+9 directories, 9 files
+
+cat motd.yml 
+---
+- name: role usage example
+  hosts: all
+
+  roles:
+          - motd
+
+
+cat ansible.cfg 
+[defaults]
+remote_user = ansible
+host_key_checking = false
+inventory = inventory
+roles_path = roles # this point to location of roles files
+
+[privilege_escalation]
+become = True
+become_method = sudo
+become_user = root
+become_ask_pass = False
+
+--- Ansible Galaxy ---
+
+galaxy.ansible.com
+
+--- Ansible Galacy CLI Utility ---
+
+ansible-galaxy --help
+
+--- Ansible Vault ---
+
+Encrypt and decrypt data files
+$ ansible-vault --help
+
+Other solutions: HashiCrop, MS Azure Key, AWS Key Management
+$ ansible-vault create FILENAME
+$ ansible-vault edit [view] FILENAME
+$ ansible-vault rekey FILENAME #new password
+$ ansible-vault decrypt FILENAME --output NEWFILENAME #removing password on new file
+$ ansible-playbook --vault-password-file=FILENAME playbook.yml
+
+--- OPTIMIZING ANSIBLE ---
+
+--- HOST NAMES ---
+
+$ ansible '*.example.com' -i inventory --list-hosts
+$ ansible server1,192.168.1.120 -i inventory --list-hosts
+$ ansinle 'web,&prod' -i inventory --list-hosts # if hosts in web and prod group
+$ ansinle 'web,!prod' -i inventory --list-hosts # if hosts in web but NOT prod group
+												# or to exclude group or hosts
+
+--- DELEGATION ---
+
+---
+- name: delegation
+  hosts: ansible01
+  tasks:
+          - name: get ps of remote host
+            command: ps
+            register: remote_process
+            changed_when: false
+
+          - name: get ps of local host
+            command: ps
+            delegate_to: localhost # this will delegate ok: [ansible01 -> localhost]
+            register: local_process
+            changed_when: false
+
+          - name: display info localhost
+            debug:
+                    msg: "{{ local_process.stdout}}"
+
+          - name: display info remote
+            debug:
+                    msg: "{{ remote_process.stdout }}"
+
+# but facts gathering will be from original host
+# delegate_to: localhost and local_action are same result
+
+
+---
+- name: test add_host
+  hosts: localhost
+  tasks:
+          - name: add another host
+            add_host:
+                    name: ubuntu
+                    ansible_host: 192.168.122.105
+                    ansible_user: ansible
+
+          - name: show where the command has been running
+            command: hostname
+            delegate_to: ubuntu
+            register: command1
+
+          - name: show how facts are handled
+            command: echo "this is on {{ inventory_hostname }}"
+            delegate_to: ubuntu
+            register: output
+
+          - debug:
+                  msg: "{{ command1.stdout }}" # should be from "ubuntu"
+          - debug:
+                  msg: "{{ output.stdout }}" # should be from "localhost"
+
+# here we add host "ubuntu"
+# facts will be gathered on localhost
+# but command will be ran on "ubuntu"
+
+
+delegate_facts: True --> to gather facts from the delegate_to host
+
+--- PARALLELISM ---
+
+forks = nn in ansible.cfg or --forks option 
+serial - reduce per host run
+
+async:3600 -- run in the background, for an hour
+poll: 10 -- 10 second to complete
+
+---
+- name: wait
+  hosts: all
+  tasks:
+          - name: set waiting limit
+            command: /bin/sleep 15
+            async: 10 # this gives only 10 second, but command needs 15, so we will have error
+            poll: 5
+
+wait_for -- wait for some result
+poll: 0 -- not to wait completion of current task
+ignore_errors
+
+
+---
+- name: restart a server
+  hosts: ansible02
+  tasks:
+          - name: restart server
+            shell: sleep 2 && shutdown -r now "rebooting, please wait"
+            async: 1
+            poll: 0
+            ignore_errors: true
+
+          - name: waiting for server to come back
+            wait_for: # waiting for ansible02 to start
+                    host: "{{ inventory_hostname }}"
+                    state: started
+                    delay: 30
+                    timeout: 300
+                    port: 22
+            delegate_to: localhost #we delegate to localhost as ansible02 will not be able do it
+
+async_status module
+
+---
+- name: download large file
+  hosts: ansible02
+  tasks:
+          - name: download large file task
+            get_url:
+                    url: https://www.xxxx.com/pub/bigfile.zip
+                    dest: /tmp/
+            async: 7200
+            poll: 0
+            register: background_download
+          - name: wait for download completion
+            async_status:
+              jid: "{{ background_download.ansible_job_id }}"
+            register: job_result
+            until: job_result.finished
+            retries: 30
+            delay: 120        
+
+--- ANSIBLE LOGGING ---
+
+log_path or $ANSIBLE_LOG_PATH, but only root can access /var/log !
+make sure that logrotate is working
+
+--start-at-task="task name"
+
+- debug:
+    msg: "the amount of free memory is {{ ansible_memfree_mb }}"
+    
+--step will stop playbook on each tasks and ask for confirmation
+
+--check will test without modifying anything
+--check --diff
+
+uri module can check URL content
+script module can execute scripts
+stat module can check file present or not
+
+
+
+ansible-playbook --syntax-check sampleplaybook.yaml   ---  check the syntax
+ansible-playbook sampleplaybook.yaml --check               ---  dry run 
+ansible-playbook sampleplaybook.yaml                           ---   executing the code
+ansible-playbook -i hosts apache.yaml  --tags="LAMP" -vvv  --syntax-check
+ansible-playbook -i hosts apache.yaml  --tags="LAMP" -vvv  --list-task
+ansible-playbook -i hosts apache.yaml  --tags="TENGINX" -vvv  --list-task
+ansible all -m ping  --extra-vars="ansible_ssh_user="dev01" ansible_ssh_pass="test123"" 
+
+--- ANSIBLE TOWER ---
+
+Use AWX on CentOS
+Package based or Docker based
+Workshop License
+
+  
