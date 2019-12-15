@@ -106,7 +106,7 @@ Inclusions - in order make small playbooks for specific tasks
 Jinja2 Templates
 To modify YAML files before they are sent to the managed host
 
-[ansible@rovshan-host base]$ cat variable-jinja.yml 
+[ansible@mohan base]$ cat variable-jinja.yml 
 ---
 - name: deploy webserver centos machines
   hosts: ansible02
@@ -116,7 +116,7 @@ To modify YAML files before they are sent to the managed host
           web_service: httpd
           firewall_service: firewalld
           rule: http
-          system_owner: anna@example.com
+          system_owner: mohan@example.com
 
   tasks:
           - name: install apache and firewall
@@ -166,7 +166,7 @@ To modify YAML files before they are sent to the managed host
         status_code: 200
                              
 
-[ansible@rovshan-host base]$ cat http.j2 
+[ansible@mohan base]$ cat http.j2 
 NameVirtualHost {{ ansible_fqdn }}
 
 <VirtualHost {{ ansible_fqdn }}:80>
@@ -176,7 +176,7 @@ NameVirtualHost {{ ansible_fqdn }}
 </VirtualHost>
 
 
-[ansible@rovshan-host base]$ ansible ansible02 -m command -a "cat /etc/httpd/conf.d/http.j2"
+[ansible@mohan base]$ ansible ansible02 -m command -a "cat /etc/httpd/conf.d/http.j2"
 ansible02 | CHANGED | rc=0 >>
 NameVirtualHost ansible02
 
@@ -194,7 +194,7 @@ ansible_local provisioner run on vagrant hosts directly
 Folder types - VirtualBox, Rsync
 config.vm.network: forwarded_port, guest: 80, host: 8080
 
-[ansible@rovshan-host vagrant]$ cat Vagrantfile 
+[ansible@mohan vagrant]$ cat Vagrantfile 
 Vagrant.configure("2") do |config|
   config.vm.box = "centos/7"
   config.vm.hostname = "test1.example.com"
@@ -203,7 +203,7 @@ Vagrant.configure("2") do |config|
 	ansible.playbook = 'playbook.yml'
   end
 end
-[ansible@rovshan-host vagrant]$ cat playbook.yml 
+[ansible@mohan vagrant]$ cat playbook.yml 
 ---
 - name: deploy webserver centos machines
   hosts:  all
@@ -369,7 +369,7 @@ vars:
 
 #EXAMPLE
 
-[ansible@rovshan-host base]$ cat nested-items.yml 
+[ansible@mohan` base]$ cat nested-items.yml 
 --- 
 - name: nested items
   hosts: all
